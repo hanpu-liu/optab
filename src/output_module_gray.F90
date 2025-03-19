@@ -76,34 +76,8 @@ CONTAINS
     INTEGER(HID_T) :: file_id!, plist_id, data_grid, data_abs, data_sca
     INTEGER(HSIZE_T), DIMENSION(1) :: dims1
     REAL(REAL64), ALLOCATABLE :: b(:), dbdt(:) ! Planck function
-   !  REAL(REAL64) :: nume, deno, weight, pla, pla2, ros, plac, plal, numec, plac2, plal2
-    REAL(REAL64) :: nume, deno, weight, numec, numegray, denogray, numecgray, plal, plal2
-    REAL(REAL64), ALLOCATABLE :: pla(:), pla2(:), ros(:), plac(:), plac2(:)
+    REAL(REAL64) :: nume, deno, weight, pla, pla2, ros, plac, plal, numec, plac2, plal2
     INTEGER(INT64) :: k, ks, ke, k_total
-    INTEGER(INT64), ALLOCATABLE :: kbin(:)
-    INTEGER(INT64) :: ncurr, nbin, nbinp1
-
-    ! ------------------------------------------
-    ! design k grid
-    nbin = 104
-    nbinp1 = nbin + 1
-    ALLOCATE(kbin(nbinp1))
-    kbin = (/33334,  48102,  48214,  48328,  48444,  48562,  48681,  48803, &
-            48927,  49053,  49181,  49311,  49444,  49579,  49717,  49858, &
-            50001,  50147,  50296,  50449,  50605,  50764,  50926,  51093, &
-            51263,  51437,  51616,  51799,  51987,  52180,  52379,  52583, &
-            52687,  52793,  52900,  53009,  53119,  53231,  53345,  53461, &
-            53579,  53698,  53820,  53944,  54070,  54198,  54328,  54461, &
-            54596,  54734,  54875,  55018,  55164,  55314,  55466,  55622, &
-            55781,  55943,  56110,  56280,  56455,  56499,  56543,  56588, &
-            56633,  56679,  56724,  56770,  56817,  56863,  56910,  56957, &
-            57005,  57052,  57100,  57149,  57198,  57396,  57600,  57810, &
-            58026,  58249,  58478,  58716,  58961,  59215,  59478,  59751, &
-            60035,  60331,  60639,  60961,  61297,  61651,  62022,  62413, &
-            62827,  63266,  63733,  64232,  64769,  65348,  65978,  66668, &
-            100001/)
-    ! last element is the gray value
-    ALLOCATE(pla(nbinp1), pla2(nbinp1), ros(nbinp1), plac(nbinp1), plac2(nbinp1))
 
     ks = LBOUND(alp,1)    ! 1
     ke = UBOUND(alp,1)    ! 100001
@@ -125,10 +99,6 @@ CONTAINS
     nume = 0d0
     numec= 0d0
     deno = 0d0
-    numegray = 0d0
-    numecgray= 0d0
-    denogray = 0d0
-    ncurr = 1
     DO k = ks, ke
        IF(k == ks) THEN
           weight = (grd(k+1) - grd(k  )) * 0.5d0
@@ -137,36 +107,17 @@ CONTAINS
        ELSE
           weight = (grd(k+1) - grd(k-1)) * 0.5d0
        END IF
-       ! gray
-       numegray = numegray + b(k) * DBLE(alp(k) + line(k)) * weight
-       numecgray= numecgray+ b(k) * DBLE(alp(k)) * weight
-       denogray = denogray + b(k)                * weight
-       ! multigroup
-       IF(ncurr .GT. nbin) CYCLE    ! out of the maximum bin, multigroup finished
-       IF(k .GT. kbin(ncurr+1) .OR. k == ke) THEN   ! one bin finished
-         pla(ncurr) = REAL(nume / deno)
-         plac(ncurr)= REAL(numec/ deno)
-         nume = 0d0
-         numec= 0d0
-         deno = 0d0
-         ncurr = ncurr + 1
-       ENDIF
-       IF(k .GT. kbin(ncurr) .AND. k .LE. kbin(ncurr+1)) THEN
-         nume = nume + b(k) * DBLE(alp(k) + line(k)) * weight
-         numec= numec+ b(k) * DBLE(alp(k)) * weight
-         deno = deno + b(k)                * weight
-       END IF
+       nume = nume + b(k) * DBLE(alp(k) + line(k)) * weight
+       numec= numec+ b(k) * DBLE(alp(k)) * weight
+       deno = deno + b(k)                * weight
     END DO
-    pla(nbinp1) = REAL(numegray / denogray)
-    plac(nbinp1)= REAL(numecgray/ denogray)
-    plal      = REAL(pmean / ((pi**4 / 15d0) * (temp / c2)**4))
+    pla = REAL(nume / deno)
+    plac= REAL(numec/ deno)
+    plal= REAL(pmean / ((pi**4 / 15d0) * (temp / c2)**4))
 
     ! ROSSELAND
     nume = 0d0
     deno = 0d0
-    numegray = 0d0
-    denogray = 0d0
-    ncurr = 1
     DO k = ks, ke
        IF(alp(k) + line(k) + sca(k) == 0d0) CYCLE
        IF(k == ks) THEN
@@ -176,25 +127,10 @@ CONTAINS
        ELSE
           weight = (grd(k+1) - grd(k-1)) * 0.5d0
        END IF
-       ! gray
-       numegray = numegray + dbdt(k)                           * weight
-       denogray = denogray + dbdt(k) / DBLE((alp(k) + line(k) +  sca(k))) * weight
-       ! debug
-       ! multigroup
-       IF(ncurr .GT. nbin) CYCLE    ! out of the maximum bin, multigroup finished
-       IF(k .GT. kbin(ncurr+1) .OR. k == ke) THEN   ! one bin finished
-          ros(ncurr) = REAL(nume / deno)
-          nume = 0d0
-          deno = 0d0
-          ncurr = ncurr + 1
-       ENDIF
-       IF(k .GT. kbin(ncurr) .AND. k .LE. kbin(ncurr+1)) THEN
-          nume = nume + dbdt(k)                           * weight
-          deno = deno + dbdt(k) / DBLE((alp(k) + line(k) +  sca(k))) * weight
-       ENDIF
+       nume = nume + dbdt(k)                           * weight
+       deno = deno + dbdt(k) / DBLE((alp(k) + line(k) +  sca(k))) * weight
     END DO
-    ros(nbinp1) = REAL(numegray / denogray)
-
+    ros = REAL(nume / deno)
 
     ! PLANCK FUNCTION with temp2
     DO k = ks, ke
@@ -204,12 +140,8 @@ CONTAINS
 
     ! PLANCK
     nume = 0d0
-    numec= 0d0
+    numec = 0d0
     deno = 0d0
-    numegray = 0d0
-    numecgray= 0d0
-    denogray = 0d0
-    ncurr = 1
     DO k = ks, ke
        IF(k == ks) THEN
           weight = (grd(k+1) - grd(k  )) * 0.5d0
@@ -218,29 +150,13 @@ CONTAINS
        ELSE
           weight = (grd(k+1) - grd(k-1)) * 0.5d0
        END IF
-       ! gray
-       numegray = numegray + b(k) * DBLE(alp(k) + line(k)) * weight
-       numecgray= numecgray+ b(k) * DBLE(alp(k)) * weight
-       denogray = denogray + b(k)                * weight
-       ! multigroup
-       IF(ncurr .GT. nbin) CYCLE    ! out of the maximum bin, multigroup finished
-       IF(k .GT. kbin(ncurr+1) .OR. k == ke) THEN   ! one bin finished
-         pla2(ncurr) = REAL(nume / deno)
-         plac2(ncurr)= REAL(numec/ deno)
-         nume = 0d0
-         numec= 0d0
-         deno = 0d0
-         ncurr = ncurr + 1
-       ENDIF
-       IF(k .GT. kbin(ncurr) .AND. k .LE. kbin(ncurr+1)) THEN
-         nume = nume + b(k) * DBLE(alp(k) + line(k)) * weight
-         numec= numec+ b(k) * DBLE(alp(k)) * weight
-         deno = deno + b(k)                * weight
-       END IF
+       nume = nume + DBLE(alp(k) + line(k)) * b(k) * weight
+       numec= numec+ b(k) * DBLE(alp(k)) * weight
+       deno = deno + b(k)                * weight
     END DO
-    pla2(nbinp1) = REAL(numegray / denogray)
-    plac2(nbinp1)= REAL(numecgray/ denogray)
-    plal2        = REAL(pmean / ((pi**4 / 15d0) * (temp / c2)**4))
+    pla2 = REAL(nume / deno)
+    plac2= REAL(numec/ deno)
+    plal2= REAL(pmean2 / ((pi**4 / 15d0) * (temp2 / c2)**4))
 
     DEALLOCATE(b, dbdt)
     ! ------------------------------------------
@@ -257,17 +173,14 @@ CONTAINS
     CALL h5LTmake_dataset_f(file_id, 'rho', 1, dims1, H5T_IEEE_F64LE, rho, error)
     ! mean opacities
     ! grid-based Planck means
-    dims1 = [nbinp1]
     CALL h5LTmake_dataset_f(file_id, 'pla', 1, dims1, H5T_IEEE_F64LE, pla, error)
     CALL h5LTmake_dataset_f(file_id, 'pla2', 1, dims1, H5T_IEEE_F64LE, pla2, error)
     ! line-based Planck means and continuum Planck means
     CALL h5LTmake_dataset_f(file_id, 'plac', 1, dims1, H5T_IEEE_F64LE, plac, error)
-    CALL h5LTmake_dataset_f(file_id, 'plac2', 1, dims1, H5T_IEEE_F64LE, plac2, error)
-    dims1 = [1]
     CALL h5LTmake_dataset_f(file_id, 'plal', 1, dims1, H5T_IEEE_F64LE, plal, error)
+    CALL h5LTmake_dataset_f(file_id, 'plac2', 1, dims1, H5T_IEEE_F64LE, plac2, error)
     CALL h5LTmake_dataset_f(file_id, 'plal2', 1, dims1, H5T_IEEE_F64LE, plal2, error)
     ! Rosseland means
-    dims1 = [nbinp1]
     CALL h5LTmake_dataset_f(file_id, 'ros', 1, dims1, H5T_IEEE_F64LE, ros, error)
     dims1 = [ns]
     CALL h5LTmake_dataset_f(file_id, 'nden', 1, dims1, H5T_IEEE_F64LE, nden, error)
@@ -280,9 +193,6 @@ CONTAINS
 
     CALL h5Fclose_f(file_id, error)
     CALL h5close_f(error)
-
-    DEALLOCATE(pla, pla2, ros, plac, plac2)
-    DEALLOCATE(kbin)
 
     RETURN
   END SUBROUTINE output_mono

@@ -1,12 +1,16 @@
 #!/bin/bash
+#SBATCH --ntasks-per-node=96
+#SBATCH --nodes=1
+#SBATCH --mail-type=begin
+#SBATCH --mail-type=end
+#SBATCH --mail-user=hanpu.liu@princeton.edu
+#SBATCH -t 00:50:00
 
 set -x -e
 
-export EOS='/Volumes/Storage/optab/eos/FastChem/table.h5'
-export OPTAB='/Volumes/Storage/optab'
-export DATABASE='/Volumes/Storage/optab/database'
-export MPIBIN='/opt/local/bin'
-  
+export EOS='/scratch/gpfs/hl1835/optab/eos/FastChem/table.h5'
+export OPTAB='/scratch/gpfs/hl1835/optab'
+export DATABASE='/scratch/gpfs/hl1835/optab/database'  
 
 ##### DIRECTORIES
 export WORKDIR=`basename "$0" | sed -e 's/.sh//'`
@@ -283,7 +287,7 @@ EOF
 ##### SELECT OPACITY SOURCES TO BE CONSIDERED (1: SELECTED, 0: NOT SELECTED)
 cat <<EOF > input/fort.5
 &switches ! selection of opacity sources
-line_molecules = 1           ! molecular lines
+line_molecules = 0           ! molecular lines
 line_kurucz_gfpred = 1       ! Kurucz gfpred lines
 line_kurucz_gfall = 1        ! Kurucz gfall lines
 rayleigh_scattering_h2 = 1   ! Rayleigh scattering by H2
@@ -311,14 +315,14 @@ temp2 = 6000d0
 /
 &grid_log_const ! wavenumber grid
 k_total = 100000 ! total number of grid points
-grd_min = 1d0    ! min value of wavenumber grid
-grd_max = 9d0    ! max value of wavenumber grid
+grd_min = 1d0    ! min value of wavenumber grid (in cm^-1)
+grd_max = 9d0    ! max value of wavenumber grid (in cm^-1)
 /
 &mpi_decomp ! total number of MPI processes = kprc * jprc * mprc * jprc
 kprc = 1  ! number of processes in wavenumber grid (EXPERIMENTAL)
 lprc = 1  ! number of processes in line loop (EXPERIMENTAL)
 mprc = 1  ! number of processes in reading line-block loop (EXPERIMENTAL)
-jprc = 12  ! number of processes in layer loop
+jprc = 96  ! number of processes in layer loop
 /
 &block_cyclic
 iblock = 1
@@ -346,6 +350,6 @@ cp $OPTAB/src/$EXEC .
 rsync -avu $OPTAB/src/*.F90 $OPTAB/src/Makefile src/
 
 ##### EXECUTION
-time $MPIBIN/mpirun -np $nprc ./$EXEC
+srun ./$EXEC > out
 #afplay /System/Library/Sounds/Blow.aiff
 #say $WORKDIR ended

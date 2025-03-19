@@ -10,7 +10,7 @@ K_BOL = 1.3806503e-16
 def read_mono_hdf5(file_path):
     try:
         with h5py.File(file_path, 'r') as f:
-            return {name: f[name][0] for name in f.keys()}
+            return {name: f[name][:] for name in f.keys()}
     except Exception as e:
         raise RuntimeError(f"Failed to read {file_path}: {e}")
 
@@ -72,12 +72,6 @@ def opac(dir_path, mean, savedata, syms):
             f.create_dataset('ros', data=ros_tot)
             f.create_dataset('pla', data=pla_tot)
         print(f"Data saved to {os.path.join(dir_path, 'output.h5')}")
-
-    # Save the plot in different formats
-    # file_basename = os.path.join(dir_path, 'output', mean)
-    # for ext in ['pdf', 'png']:
-    #     plt.savefig(f'{file_basename}.{ext}', format=ext, transparent=True)
-    #     print(f'Output file: {file_basename}.{ext}')
 
     plt.show()
 

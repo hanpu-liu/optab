@@ -3,8 +3,8 @@
 
 #define ATOMIC_IONS
 #define FASTCHEM_ORIGINAL
-#define OPTAB_DATABASE_DIR "/S/data00/G5106/y0582/database/"
-#define FASTCHEM_INPUT_DIR "/S/home01/G5106/y0582/FastChem/input/"
+#define OPTAB_DATABASE_DIR "/scratch/gpfs/hl1835/optab/database/"
+#define FASTCHEM_INPUT_DIR "/home/hl1835/code/FastChem/input/"
 
 PROGRAM prep_FastChem
 
@@ -119,11 +119,23 @@ PROGRAM prep_FastChem
   WRITE(1,'(A,F6.2,A,F6.2,A,I3,A)') '# logT = [',REAL(tmp_min),',',REAL(tmp_max),',',lmax,']'
   WRITE(1,'(A,F6.2,A,F6.2,A,I3,A)') '# logP = [',REAL(pmin),',',REAL(pmax),',',jmax,']'
 
-  dtmp = (tmp_max - tmp_min) / (lmax - 1)
+  ! dtmp = (tmp_max - tmp_min) / (lmax - 1)
   dp = (pmax - pmin) / (jmax - 1)
   
   DO l = 1, lmax
-     tmp(l) = tmp_min + (l - 1) * dtmp
+     ! default: log uniform
+     ! dtmp = (tmp_max - tmp_min) / (lmax - 1)
+     ! custom: changing dtmp
+     if(l .LE. 26) then
+        dtmp = 0.02d0
+        tmp(l) = tmp_min + (l - 1) * dtmp
+     else if(l .LE. 34) then
+        dtmp = 0.025d0
+        tmp(l) = tmp_min + 25*0.02d0 + (l - 26) * dtmp
+     else
+        dtmp = 0.05d0
+        tmp(l) = tmp_min + 25*0.02d0 + 8*0.025d0 + (l - 34) * dtmp
+     endif
      tmp(l) = 10d0**tmp(l)
      DO j = 1, jmax
         p = pmin + (j - 1) * dp
