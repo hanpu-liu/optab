@@ -521,7 +521,7 @@ CONTAINS
   END SUBROUTINE line_molec
   
 
-  SUBROUTINE line_kurucz(source, temp0, np, grd, dgrd, alp, cnt, pmean, temp2, pmean2, slines)
+  SUBROUTINE line_kurucz(source, temp0, np, grd, dgrd, alp, cnt, pmean, temp2, pmean2, slines, kbin, nbin)
     USE code_module, ONLY : ELECTRON, HI, HeI, H2
     USE const_module, ONLY : c2, k_bol, clight, e2, m_ele, pi, ene_hyd, a_0, hbar, alpha, m_hyd, amu, h, cm_to_ang
     USE h5lx_module, ONLY : h5LXread_hyperslab_dataset_F64, h5LXread_hyperslab_dataset_F32, h5LXread_hyperslab_dataset_I32, &
@@ -542,10 +542,12 @@ CONTAINS
     REAL(REAL64), INTENT(IN) :: grd(:), dgrd(:) ! wavenumber grid [cm^{-1}]
     REAL(REAL64), INTENT(OUT) :: alp(:,:) ! opacity [cm^{-1}]
     REAL(REAL64), INTENT(IN) :: cnt(:,:) ! opacity [cm^{-1}]
-    REAL(REAL64), INTENT(INOUT) :: pmean(:) ! planck_mean opacity
+    REAL(REAL64), INTENT(INOUT) :: pmean(:,:) ! planck_mean opacity
     REAL(REAL64), INTENT(IN) :: temp2 ! radiation temperature
-    REAL(REAL64), INTENT(INOUT) :: pmean2(:) ! two-temp planck_mean opacity
+    REAL(REAL64), INTENT(INOUT) :: pmean2(:,:) ! two-temp planck_mean opacity
     INTEGER(INT64), INTENT(INOUT), OPTIONAL :: slines(:,:)
+    INTEGER(INT64), INTENT(IN) :: kbin(:) ! wavenumber bin index
+    INTEGER(INT32), INTENT(IN) :: nbin ! number of wavenumber bins
 
     ! HDF5 variables
     INTEGER(HID_T) :: file_spec, grp_trans, grp_prop, grp_ion
@@ -554,6 +556,7 @@ CONTAINS
     
     ! grid index
     INTEGER(INT32) :: ks, ke, kmin, kmax
+    INTEGER(INT32) :: nbinp1, ncurr
     ! lines
     INTEGER(INT64) :: l, nlines, n_rest
     INTEGER(INT32) :: nc, nc_max, ls, le
@@ -618,6 +621,8 @@ CONTAINS
     ke = UBOUND(grd,1)
     
     ALLOCATE(prof(ks:ke))
+
+    nbinp1 = nbin + 1
 
     ! パラメータ読み込み
     OPEN(5, FILE='input/fort.5', STATUS='OLD')
@@ -828,18 +833,35 @@ CONTAINS
 #endif             
              sigma = SQRT(2d0 * k_bol * temp0(j) / (mass(code(l)) * amu)) / clight * wnum(l)
 
+             ! --- COMPUTE MULTIGROUP PLANCK-MEAN OPACITY -----
+             DO ncurr = 1, nbin
+                IF(wnum(l) .GT. grd(kbin(ncurr)) .AND. wnum(l) .LE. grd(kbin(ncurr+1))) THEN
+#ifdef PLANCK_MEAN
+                   a = wnum(l) - c2 * sigma**2 / temp0(j)
+                   ap = a / sigma
+                   pmean(ncurr,j) = pmean(ncurr,j) + np(code(l),j) * strength * &
+                      EXP(-c2 / temp0(j) * (wnum(l) + a) / 2d0) / SQRT(pi) / sigma * &
+                      0.25d0 * sigma**4 * (SQRT(pi) * ap * (2d0 * ap**2 + 3d0) * (ERF(ap) + 1d0) + &
+                      2d0 * (ap**2 + 1d0) * EXP(-ap**2))
+#else             
+                   pmean(ncurr,j) = pmean(ncurr,j) + np(code(l),j) * strength0 * wnum(l)**3 * EXP(-c2 * wnum(l) / temp0(j))
+#endif
+                   pmean2(ncurr,j) = pmean2(ncurr,j) + np(code(l),j) * strength * wnum(l)**3 / (EXP(c2 * wnum(l) / temp2) - 1d0)
+                   EXIT
+                ENDIF
+             ENDDO
              ! --- COMPUTE PLANCK-MEAN OPACITY -----
 #ifdef PLANCK_MEAN
              a = wnum(l) - c2 * sigma**2 / temp0(j)
              ap = a / sigma
-             pmean(j) = pmean(j) + np(code(l),j) * strength * &
+             pmean(nbinp1,j) = pmean(nbinp1,j) + np(code(l),j) * strength * &
                   EXP(-c2 / temp0(j) * (wnum(l) + a) / 2d0) / SQRT(pi) / sigma * &
                   0.25d0 * sigma**4 * (SQRT(pi) * ap * (2d0 * ap**2 + 3d0) * (ERF(ap) + 1d0) + &
                   2d0 * (ap**2 + 1d0) * EXP(-ap**2))
 #else             
-             pmean(j) = pmean(j) + np(code(l),j) * strength0 * wnum(l)**3 * EXP(-c2 * wnum(l) / temp0(j))
+             pmean(nbinp1,j) = pmean(nbinp1,j) + np(code(l),j) * strength0 * wnum(l)**3 * EXP(-c2 * wnum(l) / temp0(j))
 #endif
-             pmean2(j) = pmean2(j) + np(code(l),j) * strength * wnum(l)**3 / (EXP(c2 * wnum(l) / temp2) - 1d0)
+             pmean2(nbinp1,j) = pmean2(nbinp1,j) + np(code(l),j) * strength * wnum(l)**3 / (EXP(c2 * wnum(l) / temp2) - 1d0)
 #ifdef DEBUG             
              t_count(3) = t_count(3) + (mpi_wtime() - t0)
              n_count(3) = n_count(3) + 1

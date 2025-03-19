@@ -40,17 +40,18 @@ PROGRAM main
   REAL(REAL64), ALLOCATABLE :: line(:,:) ! line opacity (wavenumber,layer)
   REAL(REAL64), ALLOCATABLE :: sca(:,:) ! scattering opacity (wavenumber,layer)
   REAL(REAL64), ALLOCATABLE :: out(:,:,:) ! scattering opacity (wavenumber,layer)
-  REAL(REAL64), ALLOCATABLE :: pmean(:) ! Planck-mean opacity
-  REAL(REAL64), ALLOCATABLE :: pmean2(:) ! two-temp Planck-mean
+  REAL(REAL64), ALLOCATABLE :: pmean(:,:) ! Planck-mean opacity (wavebin,layer)
+  REAL(REAL64), ALLOCATABLE :: pmean2(:,:) ! two-temp Planck-mean (wavebin,layer)
   REAL(REAL64), ALLOCATABLE :: p_e(:)
   REAL(REAL64), ALLOCATABLE :: frac_g(:,:)
   REAL(REAL64), ALLOCATABLE :: zeta(:,:)
   INTEGER(INT64), ALLOCATABLE :: nlines(:,:)
   INTEGER(INT32), ALLOCATABLE :: map(:)
+  INTEGER(INT64), ALLOCATABLE :: kbin(:)
 
   REAL(REAL64) :: fac, wn_ion, fac_0, temp2
   INTEGER(INT32) :: j, jmax, iostat, code, z, ne, n_species, js, je, error, ns
-  INTEGER(INT32) :: ks, ke
+  INTEGER(INT32) :: ks, ke, nbin, nbinp1
   CHARACTER(LEN=64), ALLOCATABLE :: source(:)
   INTEGER(INT32) :: jj, iblock, count
   CHARACTER(LEN=4) :: id
@@ -121,6 +122,25 @@ PROGRAM main
   ks = LBOUND(grd,1)
   ke = UBOUND(grd,1)
 
+  ! SET WAVE BIN INDICES
+  nbin = 104
+  nbinp1 = nbin + 1
+  ALLOCATE(kbin(nbinp1))
+  kbin = (/33334,  48102,  48214,  48328,  48444,  48562,  48681,  48803, &
+          48927,  49053,  49181,  49311,  49444,  49579,  49717,  49858, &
+          50001,  50147,  50296,  50449,  50605,  50764,  50926,  51093, &
+          51263,  51437,  51616,  51799,  51987,  52180,  52379,  52583, &
+          52687,  52793,  52900,  53009,  53119,  53231,  53345,  53461, &
+          53579,  53698,  53820,  53944,  54070,  54198,  54328,  54461, &
+          54596,  54734,  54875,  55018,  55164,  55314,  55466,  55622, &
+          55781,  55943,  56110,  56280,  56455,  56499,  56543,  56588, &
+          56633,  56679,  56724,  56770,  56817,  56863,  56910,  56957, &
+          57005,  57052,  57100,  57149,  57198,  57396,  57600,  57810, &
+          58026,  58249,  58478,  58716,  58961,  59215,  59478,  59751, &
+          60035,  60331,  60639,  60961,  61297,  61651,  62022,  62413, &
+          62827,  63266,  63733,  64232,  64769,  65348,  65978,  66668, &
+          100001/)
+
   ! SET PARTIAL PRESSURES
   CALL read_eos(np, temp, rho)
   jmax = UBOUND(np,2)
@@ -159,14 +179,14 @@ PROGRAM main
      CALL para_range(1, count, iblock, jj, js, je)
 
      ALLOCATE(sca(ks:ke,js:je), alp(ks:ke,js:je), line(ks:ke,js:je), frac_g(js:je,UBOUND(np,1)), &
-          zeta(js:je,UBOUND(np,1)), pmean(js:je), pmean2(js:je))
+          zeta(js:je,UBOUND(np,1)), pmean(nbinp1,js:je), pmean2(nbinp1,js:je))
      ALLOCATE(nlines(js:je,4))
 
      alp(:,:) = 0d0
      line(:,:) = 0d0
      sca(:,:) = 0d0
-     pmean(:) = 0d0
-     pmean2(:) = 0d0
+     pmean(:,:) = 0d0
+     pmean2(:,:) = 0d0
 
      ! *********************
      ! CONTINUUM  ABSORPTION
@@ -365,33 +385,33 @@ PROGRAM main
      ! ***************
      ! LINE ABSORPTION
      ! ***************
-     IF(line_molecules == 1) THEN
-        call wtime(name='molecular lines:',nlines=nlines)
-        DO ns = 1, n_species
-           ALLOCATE(out(ks:ke,js:je,NA:NA))
-           CALL line_molec(source(ns), temp1(js:je), np1(:,js:je), grd(:), dgrd(:), out(:,js:je,NA), &
-                alp(:,js:je)+sca(:,js:je), pmean(js:je), temp2, pmean2(js:je), nlines(js:je,:))
-           line(:,js:je) = line(:,js:je) + out(:,js:je,NA)
-           DEALLOCATE(out)
-        END DO
-        call wtime(nlines=nlines)
-     END IF
+   !   IF(line_molecules == 1) THEN
+   !      call wtime(name='molecular lines:',nlines=nlines)
+   !      DO ns = 1, n_species
+   !         ALLOCATE(out(ks:ke,js:je,NA:NA))
+   !         CALL line_molec(source(ns), temp1(js:je), np1(:,js:je), grd(:), dgrd(:), out(:,js:je,NA), &
+   !              alp(:,js:je)+sca(:,js:je), pmean(:,js:je), temp2, pmean2(:,js:je), nlines(js:je,:))
+   !         line(:,js:je) = line(:,js:je) + out(:,js:je,NA)
+   !         DEALLOCATE(out)
+   !      END DO
+   !      call wtime(nlines=nlines)
+   !   END IF
 
-     IF(line_kurucz_phoenix == 1) THEN
-        call wtime(name='Kurucz phoenix:',nlines=nlines)
-        ALLOCATE(out(ks:ke,js:je,NA:NA))
-        CALL line_kurucz_p('kurucz_phoenix', temp1(js:je), np1(:,js:je), grd(:), dgrd(:), out(:,js:je,NA), &
-             alp(:,js:je)+sca(:,js:je), pmean(js:je), temp2, pmean2(js:je), nlines(js:je,:))
-        line(:,js:je) = line(:,js:je) + out(:,js:je,NA)
-        DEALLOCATE(out)
-        call wtime(nlines=nlines)
-     END IF
+   !   IF(line_kurucz_phoenix == 1) THEN
+   !      call wtime(name='Kurucz phoenix:',nlines=nlines)
+   !      ALLOCATE(out(ks:ke,js:je,NA:NA))
+   !      CALL line_kurucz_p('kurucz_phoenix', temp1(js:je), np1(:,js:je), grd(:), dgrd(:), out(:,js:je,NA), &
+   !           alp(:,js:je)+sca(:,js:je), pmean(:,js:je), temp2, pmean2(:,js:je), nlines(js:je,:))
+   !      line(:,js:je) = line(:,js:je) + out(:,js:je,NA)
+   !      DEALLOCATE(out)
+   !      call wtime(nlines=nlines)
+   !   END IF
      
      IF(line_kurucz_gfall == 1) THEN
         call wtime(name='Kurucz gfall:',nlines=nlines)
         ALLOCATE(out(ks:ke,js:je,NA:NA))
         CALL line_kurucz('gfall08oct17', temp1(js:je), np1(:,js:je), grd(:), dgrd(:), out(:,js:je,NA), &
-             alp(:,js:je)+sca(:,js:je), pmean(js:je), temp2, pmean2(js:je), nlines(js:je,:))
+             alp(:,js:je)+sca(:,js:je), pmean(:,js:je), temp2, pmean2(:,js:je), nlines(js:je,:), kbin(:), nbin)
         line(:,js:je) = line(:,js:je) + out(:,js:je,NA)
         DEALLOCATE(out)
         call wtime(nlines=nlines)
@@ -401,7 +421,7 @@ PROGRAM main
         call wtime(name='Kurucz gfpred:',nlines=nlines)
         ALLOCATE(out(ks:ke,js:je,NA:NA))
         CALL line_kurucz('gfpred26apr18', temp1(js:je), np1(:,js:je), grd(:), dgrd(:), out(:,js:je,NA), &
-             alp(:,js:je)+sca(:,js:je), pmean(js:je), temp2, pmean2(js:je), nlines(js:je,:))
+             alp(:,js:je)+sca(:,js:je), pmean(:,js:je), temp2, pmean2(:,js:je), nlines(js:je,:), kbin(:), nbin)
         line(:,js:je) = line(:,js:je) + out(:,js:je,NA)
         DEALLOCATE(out)
         call wtime(nlines=nlines)
@@ -412,7 +432,7 @@ PROGRAM main
      DO j = js, je
         IF(myrk_jconst == 0) THEN
            CALL output_mono(map(j), temp1(j), np1(:,j), grd(:), alp(:,j), sca(:,j), line(:,j), temp2, rho1(j), &
-                pmean(j), pmean2(j))
+                pmean(:,j), pmean2(:,j), kbin(:), nbin)
         END IF
      END DO
      DEALLOCATE(alp, sca, line, frac_g, zeta, nlines, pmean, pmean2)
