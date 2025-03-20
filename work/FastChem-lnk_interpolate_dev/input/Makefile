@@ -2,16 +2,15 @@
 OPENMPI = /opt/local
 HDF5 = /opt/local
 
-FFLAGS  = #-fallow-argument-mismatch -Wall -O3 #-fbounds-check
+FFLAGS  = # -fallow-argument-mismatch -Wall -O3 #-fbounds-check
 
 ### SYSTEM INDEPENDENT SECTION
 SHELL = /bin/sh
 
-# H5PFC = false
 H5PFC = true
 ifeq ($(H5PFC),true)
-# FC = $(HDF5)/bin/h5pfc
 FC = h5pfc
+# FC = $(HDF5)/bin/h5pfc
 else
 FC = $(OPENMPI)/bin/mpif90
 FFLAGS += -I$(OPENMPI)/include -I$(HDF5)/include

@@ -79,14 +79,14 @@ CONTAINS
     INTEGER(HSIZE_T), DIMENSION(1) :: dims1
     REAL(REAL64), ALLOCATABLE :: b(:), dbdt(:) ! Planck function
    !  REAL(REAL64) :: nume, deno, weight, pla, pla2, ros, plac, plal, numec, plac2, plal2
-    REAL(REAL64) :: nume, deno, weight, numec, numegray, denogray, numecgray
-    REAL(REAL64), ALLOCATABLE :: pla(:), pla2(:), ros(:), plac(:), plac2(:), plal(:), plal2(:)
+    REAL(REAL64) :: nume, deno, weight, numec, numee, numes, numegray, denogray, numecgray, numeegray, numesgray
+    REAL(REAL64), ALLOCATABLE :: pla(:), pla2(:), ros(:), plac(:), plac2(:), plal(:), plal2(:), eff(:), scamean(:)
     INTEGER(INT64) :: k, ks, ke, k_total, nbinp1
 
     ! ------------------------------------------
     nbinp1 = nbin + 1
     ! last element is the gray value
-    ALLOCATE(pla(nbinp1), pla2(nbinp1), ros(nbinp1), plac(nbinp1), plac2(nbinp1), plal(nbinp1), plal2(nbinp1))
+    ALLOCATE(pla(nbinp1), pla2(nbinp1), ros(nbinp1), plac(nbinp1), plac2(nbinp1), plal(nbinp1), plal2(nbinp1), eff(nbinp1), scamean(nbinp1))
 
     ks = LBOUND(alp,1)    ! 1
     ke = UBOUND(alp,1)    ! 100001
@@ -107,9 +107,13 @@ CONTAINS
     ! PLANCK
     nume = 0d0
     numec= 0d0
+    numee= 0d0
+    numes= 0d0
     deno = 0d0
     numegray = 0d0
     numecgray= 0d0
+    numeegray= 0d0
+    numesgray= 0d0
     denogray = 0d0
     ncurr = 1
     DO k = ks, ke
@@ -123,26 +127,36 @@ CONTAINS
        ! gray
        numegray = numegray + b(k) * DBLE(alp(k) + line(k)) * weight
        numecgray= numecgray+ b(k) * DBLE(alp(k)) * weight
+       numeegray= numeegray+ b(k) * DBLE(SQRT(3d0 * (alp(k) + line(k) + sca(k)) * (alp(k) + line(k)))) * weight
+       numesgray= numesgray+ b(k) * DBLE(sca(k)) * weight
        denogray = denogray + b(k)                * weight
        ! multigroup
        IF(ncurr .GT. nbin) CYCLE    ! out of the maximum bin, multigroup finished
        IF(k .GT. kbin(ncurr+1) .OR. k == ke) THEN   ! one bin finished
          pla(ncurr)  = REAL(nume / deno)
          plac(ncurr) = REAL(numec/ deno)
+         eff(ncurr) = REAL(numee/ deno)
+         scamean(ncurr) = REAL(numes/ deno)
          plal(ncurr) = REAL(pmean(ncurr)/ deno * (2d0 * h * c**2))
          nume = 0d0
          numec= 0d0
+         numee= 0d0
+         numes= 0d0
          deno = 0d0
          ncurr = ncurr + 1
        ENDIF
        IF(k .GT. kbin(ncurr) .AND. k .LE. kbin(ncurr+1)) THEN
          nume = nume + b(k) * DBLE(alp(k) + line(k)) * weight
          numec= numec+ b(k) * DBLE(alp(k)) * weight
+         numee= numee+ b(k) * DBLE(SQRT(3d0 * (alp(k) + line(k) + sca(k)) * (alp(k) + line(k)))) * weight
+         numes= numes+ b(k) * DBLE(sca(k)) * weight
          deno = deno + b(k)                * weight
        END IF
     END DO
     pla(nbinp1)  = REAL(numegray / denogray)
     plac(nbinp1) = REAL(numecgray/ denogray)
+    eff(nbinp1) = REAL(numeegray/ denogray)
+    scamean(nbinp1) = REAL(numesgray/ denogray)
     plal(nbinp1) = REAL(pmean(nbinp1) / denogray * (2d0 * h * c**2))
 
     ! ROSSELAND
@@ -250,8 +264,10 @@ CONTAINS
     CALL h5LTmake_dataset_f(file_id, 'plac2', 1, dims1, H5T_IEEE_F64LE, plac2, error)
     CALL h5LTmake_dataset_f(file_id, 'plal', 1, dims1, H5T_IEEE_F64LE, plal, error)
     CALL h5LTmake_dataset_f(file_id, 'plal2', 1, dims1, H5T_IEEE_F64LE, plal2, error)
+    ! Planck-like scattering mean
+    CALL h5LTmake_dataset_f(file_id, 'scamean', 1, dims1, H5T_IEEE_F64LE, scamean, error)
+    CALL h5LTmake_dataset_f(file_id, 'eff', 1, dims1, H5T_IEEE_F64LE, eff, error)
     ! Rosseland means
-    dims1 = [nbinp1]
     CALL h5LTmake_dataset_f(file_id, 'ros', 1, dims1, H5T_IEEE_F64LE, ros, error)
     dims1 = [ns]
     CALL h5LTmake_dataset_f(file_id, 'nden', 1, dims1, H5T_IEEE_F64LE, nden, error)
@@ -265,7 +281,7 @@ CONTAINS
     CALL h5Fclose_f(file_id, error)
     CALL h5close_f(error)
 
-    DEALLOCATE(pla, pla2, ros, plac, plac2)
+    DEALLOCATE(pla, pla2, ros, plac, plac2, plal, plal2, eff, scamean)
 
     RETURN
   END SUBROUTINE output_mono

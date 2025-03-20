@@ -95,7 +95,7 @@ PROGRAM prep_FastChem
   WRITE(1,*) 'ND'
   WRITE(1,*) ''
   WRITE(1,*) '#Element abundance file'
-  WRITE(1,*) 'input/element_abundances_solar.dat'
+  WRITE(1,*) 'input/element_abundances_solar_m40.dat'
   WRITE(1,*) ''
   WRITE(1,*) '#Species data file'
   WRITE(1,*) 'input/'//TRIM(fname_species)
@@ -119,23 +119,11 @@ PROGRAM prep_FastChem
   WRITE(1,'(A,F6.2,A,F6.2,A,I3,A)') '# logT = [',REAL(tmp_min),',',REAL(tmp_max),',',lmax,']'
   WRITE(1,'(A,F6.2,A,F6.2,A,I3,A)') '# logP = [',REAL(pmin),',',REAL(pmax),',',jmax,']'
 
-  ! dtmp = (tmp_max - tmp_min) / (lmax - 1)
+  dtmp = (tmp_max - tmp_min) / (lmax - 1)
   dp = (pmax - pmin) / (jmax - 1)
   
   DO l = 1, lmax
-     ! default: log uniform
-     ! dtmp = (tmp_max - tmp_min) / (lmax - 1)
-     ! custom: changing dtmp
-     if(l .LE. 26) then
-        dtmp = 0.02d0
-        tmp(l) = tmp_min + (l - 1) * dtmp
-     else if(l .LE. 34) then
-        dtmp = 0.025d0
-        tmp(l) = tmp_min + 25*0.02d0 + (l - 26) * dtmp
-     else
-        dtmp = 0.05d0
-        tmp(l) = tmp_min + 25*0.02d0 + 8*0.025d0 + (l - 34) * dtmp
-     endif
+     tmp(l) = tmp_min + (l - 1) * dtmp
      tmp(l) = 10d0**tmp(l)
      DO j = 1, jmax
         p = pmin + (j - 1) * dp

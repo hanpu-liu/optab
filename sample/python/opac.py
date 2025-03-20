@@ -32,6 +32,16 @@ def opac(dir_path, mean, savedata, syms):
     pla_tot = np.log10(np.array([data['plac'] + data['plal'] for data in datasets]) / rho_tot)
     pla2_tot = np.log10(np.array([data['plac2'] + data['plal2'] for data in datasets]) / rho_tot)
 
+    # save the data
+    if savedata:
+        with h5py.File(os.path.join(dir_path, 'output.h5'), 'w') as f:
+            f.create_dataset('temp', data=tmp_tot)
+            f.create_dataset('rho', data=rho_tot)
+            f.create_dataset('pre', data=pre_tot)
+            f.create_dataset('ros', data=ros_tot)
+            f.create_dataset('pla', data=pla_tot)
+        print(f"Data saved to {os.path.join(dir_path, 'output.h5')}")
+
     # Color scaling for visualization
     vmax, vmin = 7.0, -6.0
 
@@ -62,16 +72,6 @@ def opac(dir_path, mean, savedata, syms):
     plt.title(title)
     plt.colorbar(scatter, label=btitle)
     plt.grid(True)
-
-    # save the data
-    if savedata:
-        with h5py.File(os.path.join(dir_path, 'output.h5'), 'w') as f:
-            f.create_dataset('temp', data=tmp_tot)
-            f.create_dataset('rho', data=rho_tot)
-            f.create_dataset('pre', data=pre_tot)
-            f.create_dataset('ros', data=ros_tot)
-            f.create_dataset('pla', data=pla_tot)
-        print(f"Data saved to {os.path.join(dir_path, 'output.h5')}")
 
     # Save the plot in different formats
     # file_basename = os.path.join(dir_path, 'output', mean)

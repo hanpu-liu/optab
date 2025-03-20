@@ -1,16 +1,16 @@
 #!/bin/bash
-#SBATCH --ntasks-per-node=96
+#SBATCH --ntasks-per-node=48
 #SBATCH --nodes=1
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
 #SBATCH --mail-user=hanpu.liu@princeton.edu
-#SBATCH -t 00:50:00
+#SBATCH -t 00:10:00
 
 set -x -e
 
 export EOS='/scratch/gpfs/hl1835/optab/eos/FastChem/table.h5'
 export OPTAB='/scratch/gpfs/hl1835/optab'
-export DATABASE='/scratch/gpfs/hl1835/optab/database'  
+export DATABASE='/scratch/gpfs/hl1835/optab/database'    
 
 ##### DIRECTORIES
 export WORKDIR=`basename "$0" | sed -e 's/.sh//'`
@@ -288,8 +288,8 @@ EOF
 cat <<EOF > input/fort.5
 &switches ! selection of opacity sources
 line_molecules = 0           ! molecular lines
-line_kurucz_gfpred = 1       ! Kurucz gfpred lines
-line_kurucz_gfall = 1        ! Kurucz gfall lines
+line_kurucz_gfpred = 0       ! Kurucz gfpred lines
+line_kurucz_gfall = 0        ! Kurucz gfall lines
 rayleigh_scattering_h2 = 1   ! Rayleigh scattering by H2
 rayleigh_scattering_he = 1   ! Rayleigh scattering by He
 rayleigh_scattering_h = 1    ! Rayleigh scattering by H
@@ -322,7 +322,7 @@ grd_max = 9d0    ! max value of wavenumber grid (in cm^-1)
 kprc = 1  ! number of processes in wavenumber grid (EXPERIMENTAL)
 lprc = 1  ! number of processes in line loop (EXPERIMENTAL)
 mprc = 1  ! number of processes in reading line-block loop (EXPERIMENTAL)
-jprc = 96  ! number of processes in layer loop
+jprc = 48  ! number of processes in layer loop
 /
 &block_cyclic
 iblock = 1
