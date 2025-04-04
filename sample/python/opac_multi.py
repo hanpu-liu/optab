@@ -39,7 +39,8 @@ def opac(dir_path, mean, savedata, syms):
                        'logkappa_r': [np.log10(data['ros'] / data['rho'][0]) for data in datasets], 
                        'logkappa_p': [np.log10((data['plac'] + data['plal']) / data['rho'][0]) for data in datasets],
                        'logkappa_s': [np.log10(data['scamean'] / data['rho'][0]) for data in datasets],
-                       'logkappa_e': [np.log10(data['eff'] / data['rho'][0]) for data in datasets]})
+                       'logkappa_e': [np.log10(data['eff'] / data['rho'][0]) for data in datasets],
+                       'logkappa_a': [np.log10(data['absmean'] / data['rho'][0]) for data in datasets]})
     df = df.sort_values(by=['temp', 'rho'], ignore_index=True)
 
     if savedata:
@@ -51,6 +52,7 @@ def opac(dir_path, mean, savedata, syms):
             f.create_dataset('logkappa_p', data=np.array(df['logkappa_p'].to_list()))
             f.create_dataset('logkappa_s', data=np.array(df['logkappa_s'].to_list()))
             f.create_dataset('logkappa_e', data=np.array(df['logkappa_e'].to_list()))
+            f.create_dataset('logkappa_a', data=np.array(df['logkappa_a'].to_list()))
         print(f"Data saved to {os.path.join(dir_path, 'output.h5')}")
 
     # save the data
